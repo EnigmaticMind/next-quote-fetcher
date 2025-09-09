@@ -12,7 +12,25 @@ async function getQuotes(pgnum: number) {
   console.log(`Request URL to scrape ${url}`)
 
    try {
-    const browser = await puppeteer.launch();
+    const isVercel = !!process.env.VERCEL_ENV;
+    let puppeteer: any,
+      launchOptions: any = {
+        headless: true,
+      };
+      
+    if (isVercel) {
+      const chromium = (await import("@sparticuz/chromium")).default;
+      puppeteer = await import("puppeteer-core");
+      launchOptions = {
+        ...launchOptions,
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+      };
+    } else {
+      puppeteer = await import("puppeteer");
+    }
+
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TO });
