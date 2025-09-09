@@ -1,6 +1,4 @@
 
-import puppeteer from 'puppeteer'
-
 // Login credentials
 const username = "a"
 const password = "b"
@@ -17,7 +15,7 @@ async function getQuotes(pgnum: number) {
       launchOptions: any = {
         headless: true,
       };
-      
+
     if (isVercel) {
       const chromium = (await import("@sparticuz/chromium")).default;
       puppeteer = await import("puppeteer-core");
