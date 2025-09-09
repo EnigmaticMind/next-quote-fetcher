@@ -1,103 +1,304 @@
-import Image from "next/image";
+import { useState, useEffect } from "react";
+
+import ActionsPanel from "./components/actions-panel";
+import QuoteCell from "./components/quote-cell";
+import QuoteDetails from "./components/quote-details";
+import Toast from "./components/toast";
+import { useSearchParams } from "next/navigation";
+
+// Cache
+const quotesCache: Map<number, Promise<Map<number, Quote>>> = new Map();
+
+// Max Pages
+const maxPages = 10;
+// Max Items Per Page
+const maxItemsPerPage = 10;
+
+interface Quote {
+  text: string;
+  author: string;
+  tags: string[];
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const searchParams = useSearchParams();
+  // Toggle artificial delay in fetching quotes
+  const TOGGLE_DELAY = searchParams.get("delay") === "false" ? false : true;
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [toast, setToast] = useState<string | null>(null);
+  const [focusedCell, setFocusedCell] = useState<number | null>(null);
+  const [selectedCells, setSelectedCells] = useState<Set<number>>(new Set());
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [cellContent, setCellContent] = useState<{ [key: number]: any }>({});
+  const [loadingCells, setLoadingCells] = useState<Set<number>>(new Set());
+  const [loadingMessages, setLoadingMessages] = useState<{
+    [key: number]: string;
+  }>({});
+
+  const getRandomQuote = async () => {
+    const randomPg = Math.floor(Math.random() * maxPages) + 1;
+    const randomIndex = Math.floor(Math.random() * maxItemsPerPage);
+
+    try {
+      if (quotesCache.get(randomPg)) {
+        console.log(`Returning cached quote ${randomPg} ${randomIndex}`);
+      } else {
+        const url = `https://glowing-invention-gv9qvjpvgg43w4q6-3000.app.github.dev/?page=${randomPg}`;
+
+        console.log(`Fetching quote ${randomIndex} from page ${randomPg}`);
+
+        // Add promise onto the stack in case multiple calls to the set page occur
+        quotesCache.set(
+          randomPg,
+          new Promise(async (resolve, reject) => {
+            const res = await fetch(url);
+            if (!res.ok) {
+              console.log(`HTTP error ${res.status}: ${res.statusText}`);
+              quotesCache.delete(randomPg);
+              const err =
+                "Problem retrieving quotes make sure the remote server is running and hit space again";
+              setToast(err);
+              reject();
+              return { error: err };
+            }
+
+            const pgMap: Map<number, Quote> = new Map();
+
+            const data = await res.json();
+            data.forEach((quote: Quote, i: number) => {
+              console.log("");
+              console.log(quote);
+              pgMap.set(i, quote);
+            });
+
+            resolve(pgMap);
+          })
+        );
+      }
+
+      const pgPromise = await quotesCache.get(randomPg);
+
+      return pgPromise?.get(randomIndex);
+    } catch (err: any) {
+      console.error("** Fetch Failed:", err?.message);
+      return { error: err?.message };
+    }
+  };
+
+  const startLoadingSequence = async (cellIndex: number) => {
+    const messages = [
+      "Starting fetch...",
+      "Logging in...",
+      `Browsing to page ${Math.floor(Math.random() * 10) + 1}...`,
+      "Selecting random quote...",
+      "Selected.",
+    ];
+
+    setLoadingCells((prev) => new Set([...prev, cellIndex]));
+
+    for (let i = 0; i < messages.length; i++) {
+      setLoadingMessages((prev) => ({ ...prev, [cellIndex]: messages[i] }));
+      const randomDelay = TOGGLE_DELAY
+        ? Math.floor(Math.random() * (2400 - 1200 + 1)) + 1200
+        : 0;
+      await new Promise((resolve) => setTimeout(resolve, randomDelay));
+    }
+
+    try {
+      const rndQuote = await getRandomQuote();
+      console.log(`::Quote::`);
+      console.log(rndQuote);
+      if (rndQuote) {
+        console.log("text" in rndQuote);
+      }
+
+      // Set the final quote
+      setCellContent((prev) => ({
+        ...prev,
+        [cellIndex]: rndQuote && "text" in rndQuote ? rndQuote : null,
+      }));
+
+      // Clean up loading state
+      setLoadingCells((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(cellIndex);
+        return newSet;
+      });
+      setLoadingMessages((prev) => {
+        const newMessages = { ...prev };
+        delete newMessages[cellIndex];
+        return newMessages;
+      });
+    } catch (err: any) {
+      console.error("Random quote failure:", err?.message);
+    }
+  };
+
+  useEffect(() => {
+    console.log("-- Rendeirng welcome component");
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (focusedCell === null) {
+        e.preventDefault();
+        setFocusedCell(0);
+        return;
+      }
+
+      const currentRow = Math.floor(focusedCell / 3);
+      const currentCol = focusedCell % 3;
+
+      const selectPath = (start: number, end: number) => {
+        const newSet = new Set(selectedCells);
+        newSet.add(end);
+        setSelectedCells(newSet);
+      };
+
+      switch (e.key) {
+        case "ArrowUp":
+          e.preventDefault();
+          if (currentRow > 0) {
+            const newFocus = focusedCell - 3;
+            setFocusedCell(newFocus);
+            if (e.shiftKey) {
+              if (selectionStart === null) {
+                setSelectionStart(focusedCell);
+                setSelectedCells(new Set([focusedCell]));
+              }
+              selectPath(selectionStart!, newFocus);
+            } else {
+              setSelectionStart(null);
+            }
+          }
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          if (currentRow < 99) {
+            const newFocus = focusedCell + 3;
+            setFocusedCell(newFocus);
+            if (e.shiftKey) {
+              if (selectionStart === null) {
+                setSelectionStart(focusedCell);
+                setSelectedCells(new Set([focusedCell]));
+              }
+              selectPath(selectionStart!, newFocus);
+            } else {
+              setSelectionStart(null);
+            }
+          }
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (currentCol > 0) {
+            const newFocus = focusedCell - 1;
+            setFocusedCell(newFocus);
+            if (e.shiftKey) {
+              if (selectionStart === null) {
+                setSelectionStart(focusedCell);
+                setSelectedCells(new Set([focusedCell]));
+              }
+              selectPath(selectionStart!, newFocus);
+            } else {
+              setSelectionStart(null);
+            }
+          }
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (currentCol < 2) {
+            const newFocus = focusedCell + 1;
+            setFocusedCell(newFocus);
+            if (e.shiftKey) {
+              if (selectionStart === null) {
+                setSelectionStart(focusedCell);
+                setSelectedCells(new Set([focusedCell]));
+              }
+              selectPath(selectionStart!, newFocus);
+            } else {
+              setSelectionStart(null);
+            }
+          }
+          break;
+        case "x":
+        case "X":
+          e.preventDefault();
+          setSelectedCells((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(focusedCell)) {
+              newSet.delete(focusedCell);
+            } else {
+              newSet.add(focusedCell);
+            }
+            return newSet;
+          });
+          setSelectionStart(null);
+          break;
+        case " ":
+          e.preventDefault();
+          if (selectedCells.size > 0) {
+            selectedCells.forEach((cellIndex) => {
+              if (!loadingCells.has(cellIndex)) {
+                startLoadingSequence(cellIndex);
+              }
+            });
+          } else if (focusedCell !== null) {
+            if (!loadingCells.has(focusedCell)) {
+              startLoadingSequence(focusedCell);
+            }
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          setSelectedCells(new Set());
+          setSelectionStart(null);
+          break;
+        case "a":
+        case "A":
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const allCells = new Set(Array.from({ length: 300 }, (_, i) => i));
+            setSelectedCells(allCells);
+            setSelectionStart(null);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [focusedCell, selectionStart, selectedCells, cellContent, loadingCells]);
+
+  return (
+    <main className="min-h-screen p-8 bg-background">
+      <div className="mx-auto w-fit">
+        <h1 className="text-3xl font-bold text-center mb-8 text-foreground">
+          Live Quote Scraper
+        </h1>
+
+        <div className="flex gap-8 items-start">
+          {/* Left section - Actions */}
+          <ActionsPanel />
+
+          {/* Center section - Grid */}
+          <div className="grid grid-cols-3 gap-2 flex-shrink-0">
+            {Array.from({ length: 300 }, (_, i) => (
+              <QuoteCell
+                key={i}
+                index={i}
+                isFocused={focusedCell === i}
+                isSelected={selectedCells.has(i)}
+                isLoading={loadingCells.has(i)}
+                loadingMessage={loadingMessages[i]}
+                content={cellContent[i]}
+              />
+            ))}
+          </div>
+
+          {/* Right section - Details */}
+          <QuoteDetails
+            cellContent={focusedCell === null ? null : cellContent[focusedCell]}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+    </main>
   );
 }
