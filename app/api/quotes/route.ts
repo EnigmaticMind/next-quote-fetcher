@@ -5,11 +5,14 @@ const password = "b"
 
 const TO = 30000
 
+const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v138.0.2/chromium-v138.0.2-pack.x64.tar"
+
 async function getQuotes(pgnum: number) {
   const url = pgnum ? `https://quotes.toscrape.com/page/${pgnum}/` : `https://quotes.toscrape.com/`
   console.log(`Request URL to scrape ${url}`)
 
    try {
+    process.env.VERCEL_ENV = "true"
     const isVercel = !!process.env.VERCEL_ENV;
     let puppeteer: any,
       launchOptions: any = {
@@ -22,7 +25,7 @@ async function getQuotes(pgnum: number) {
       launchOptions = {
         ...launchOptions,
         args: chromium.args,
-        executablePath: await chromium.executablePath(),
+        executablePath: await chromium.executablePath(remoteExecutablePath),
       };
     } else {
       puppeteer = await import("puppeteer");
