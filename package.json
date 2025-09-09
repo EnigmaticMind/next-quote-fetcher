@@ -8,8 +8,9 @@
     "start": "next start"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^138.0.2",
     "next": "15.5.2",
-    "puppeteer": "^24.19.0",
+    "puppeteer-core": "^24.19.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "tw-animate-css": "^1.3.8"
@@ -19,6 +20,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "puppeteer": "^24.19.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
