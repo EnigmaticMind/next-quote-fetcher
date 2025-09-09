@@ -7,7 +7,6 @@ import QuoteCell from "./components/quote-cell";
 import QuoteDetails from "./components/quote-details";
 import Toast from "./components/toast";
 import { useSearchParams } from "next/navigation";
-import { connection } from "next/server";
 
 // Cache
 const quotesCache: Map<number, Promise<Map<number, Quote>>> = new Map();
@@ -23,9 +22,7 @@ interface Quote {
   tags: string[];
 }
 
-export default async function Home() {
-  await connection();
-
+export default function Home() {
   const searchParams = useSearchParams();
   // Toggle artificial delay in fetching quotes
   const TOGGLE_DELAY = searchParams.get("delay") === "false" ? false : true;
@@ -48,7 +45,7 @@ export default async function Home() {
       if (quotesCache.get(randomPg)) {
         console.log(`Returning cached quote ${randomPg} ${randomIndex}`);
       } else {
-        const url = `https://glowing-invention-gv9qvjpvgg43w4q6-3000.app.github.dev/?page=${randomPg}`;
+        const url = `/api/quotes/?page=${randomPg}`;
 
         console.log(`Fetching quote ${randomIndex} from page ${randomPg}`);
 
