@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 
 import ActionsPanel from "./components/actions-panel";
@@ -5,6 +7,7 @@ import QuoteCell from "./components/quote-cell";
 import QuoteDetails from "./components/quote-details";
 import Toast from "./components/toast";
 import { useSearchParams } from "next/navigation";
+import { connection } from "next/server";
 
 // Cache
 const quotesCache: Map<number, Promise<Map<number, Quote>>> = new Map();
@@ -20,7 +23,9 @@ interface Quote {
   tags: string[];
 }
 
-export default function Home() {
+export default async function Home() {
+  await connection();
+
   const searchParams = useSearchParams();
   // Toggle artificial delay in fetching quotes
   const TOGGLE_DELAY = searchParams.get("delay") === "false" ? false : true;
